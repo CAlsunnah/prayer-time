@@ -1,0 +1,365 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>أوقات الصلاة</title>
+    
+    <!-- Tajawal Font -->
+    <link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@400;500;700&display=swap" rel="stylesheet">
+    <!-- Font Awesome -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    
+    <style>
+        :root {
+            --primary-color: #2c3e50;
+            --secondary-color: #0b8043;
+            --mint-green: #e6f7ee;
+            --text-color: #555;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Tajawal', sans-serif;
+            background: #f8f9fa;
+            padding: 15px;
+        }
+
+        /* استخدام الأرقام الإنجليزية في جميع العناصر */
+        * {
+            font-variant-numeric: lining-nums;
+        }
+
+        .prayer-widget {
+            background: white;
+            border-radius: 12px;
+            padding: 20px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+            max-width: 400px;
+            margin: 0 auto;
+        }
+
+        .widget-header {
+            text-align: center;
+            margin-bottom: 20px;
+            padding-bottom: 15px;
+            border-bottom: 2px solid #e9ecef;
+        }
+
+        .widget-title {
+            color: var(--primary-color);
+            font-size: 1.4rem;
+            font-weight: 700;
+            margin-bottom: 5px;
+        }
+
+        .widget-location {
+            color: var(--secondary-color);
+            font-size: 0.9rem;
+        }
+
+        .next-prayer {
+            background: var(--mint-green);
+            padding: 15px;
+            border-radius: 10px;
+            text-align: center;
+            margin-bottom: 20px;
+            border: 2px solid var(--secondary-color);
+        }
+
+        .next-prayer-label {
+            color: var(--secondary-color);
+            font-size: 0.9rem;
+            font-weight: 600;
+            margin-bottom: 5px;
+        }
+
+        .next-prayer-time {
+            font-size: 1.8rem;
+            font-weight: 700;
+            color: var(--primary-color);
+            margin-bottom: 5px;
+        }
+
+        .countdown {
+            color: var(--secondary-color);
+            font-size: 0.9rem;
+        }
+
+        .prayer-list {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        .prayer-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 8px 12px;
+            background: #f8f9fa;
+            border-radius: 8px;
+            transition: all 0.3s ease;
+        }
+
+        .prayer-row.next-prayer {
+            background: var(--mint-green);
+            border: 1px solid var(--secondary-color);
+        }
+
+        .prayer-name {
+            color: var(--secondary-color);
+            font-weight: 600;
+            font-size: 0.9rem;
+        }
+
+        .prayer-time {
+            color: var(--primary-color);
+            font-weight: 700;
+            font-size: 0.9rem;
+        }
+
+        .loading {
+            text-align: center;
+            padding: 20px;
+            color: var(--text-color);
+        }
+
+        .spinner {
+            width: 30px;
+            height: 30px;
+            border: 3px solid #e9ecef;
+            border-top: 3px solid var(--secondary-color);
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 10px;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .error {
+            background: #f8d7da;
+            color: #721c24;
+            padding: 15px;
+            border-radius: 8px;
+            text-align: center;
+            font-size: 0.9rem;
+        }
+
+        /* Compact version for smaller embeds */
+        .compact .prayer-widget {
+            padding: 15px;
+            max-width: 300px;
+        }
+
+        .compact .widget-title {
+            font-size: 1.2rem;
+        }
+
+        .compact .next-prayer-time {
+            font-size: 1.5rem;
+        }
+
+        .compact .prayer-row {
+            padding: 6px 10px;
+        }
+    </style>
+</head>
+<body>
+    <div class="prayer-widget">
+        <div class="widget-header">
+            <h2 class="widget-title">أوقات الصلاة</h2>
+            <div class="widget-location">
+                <i class="fas fa-map-marker-alt"></i>
+                Fuenlabrada, Madrid
+            </div>
+        </div>
+
+        <div id="widgetContent">
+            <div class="loading">
+                <div class="spinner"></div>
+                جاري التحميل...
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Prayer Times Widget - مدمج بالكامل
+        (function() {
+            'use strict';
+            
+            // إعدادات الموقع
+            const WIDGET_CONFIG = {
+                location: {
+                    latitude: 40.2837,
+                    longitude: -3.7944,
+                    timezone: 'Europe/Madrid'
+                },
+                apiBase: 'https://api.aladhan.com/v1',
+                refreshInterval: 60000 // دقيقة واحدة
+            };
+
+            // Prayer Times API
+            const prayerAPI = {
+                // الحصول على أوقات الصلاة
+                async getPrayerTimes() {
+                    try {
+                        const now = new Date();
+                        const day = now.getDate();
+                        const month = now.getMonth() + 1;
+                        const year = now.getFullYear();
+                        
+                        const { latitude, longitude, timezone } = WIDGET_CONFIG.location;
+                        
+                        const response = await fetch(
+                            `${WIDGET_CONFIG.apiBase}/timings/${day}-${month}-${year}?latitude=${latitude}&longitude=${longitude}&method=3&timezone=${timezone}`
+                        );
+                        
+                        const data = await response.json();
+                        
+                        if (data.code === 200) {
+                            return data.data;
+                        } else {
+                            throw new Error('Failed to fetch prayer times');
+                        }
+                    } catch (error) {
+                        console.error('Error:', error);
+                        return null;
+                    }
+                },
+
+                // حساب الصلاة القادمة
+                calculateNextPrayer(timings) {
+                    const now = new Date();
+                    const madridTime = new Date(now.toLocaleString("en-US", { timeZone: "Europe/Madrid" }));
+                    const currentMinutes = madridTime.getHours() * 60 + madridTime.getMinutes();
+
+                    const prayers = [
+                        { name: 'Fajr', time: timings.Fajr, nameAr: 'الفجر' },
+                        { name: 'Dhuhr', time: timings.Dhuhr, nameAr: 'الظهر' },
+                        { name: 'Asr', time: timings.Asr, nameAr: 'العصر' },
+                        { name: 'Maghrib', time: timings.Maghrib, nameAr: 'المغرب' },
+                        { name: 'Isha', time: timings.Isha, nameAr: 'العشاء' }
+                    ];
+
+                    let nextPrayer = null;
+                    let minMinutes = Infinity;
+
+                    for (let prayer of prayers) {
+                        const [hours, minutes] = prayer.time.split(':').map(Number);
+                        const prayerMinutes = hours * 60 + minutes;
+                        const diff = prayerMinutes - currentMinutes;
+
+                        if (diff > 0 && diff < minMinutes) {
+                            nextPrayer = prayer;
+                            minMinutes = diff;
+                        }
+                    }
+
+                    // إذا لم نجد صلاة قادمة اليوم، فالصلاة القادمة هي فجر الغد
+                    if (!nextPrayer) {
+                        nextPrayer = prayers[0];
+                        const [hours, minutes] = prayers[0].time.split(':').map(Number);
+                        minMinutes = (24 * 60 - currentMinutes) + (hours * 60 + minutes);
+                    }
+
+                    return { nextPrayer, minutes: minMinutes };
+                },
+
+                // تنسيق العد التنازلي
+                formatCountdown(minutes) {
+                    const hours = Math.floor(minutes / 60);
+                    const mins = minutes % 60;
+                    return hours > 0 ? `${hours}س ${mins}د` : `${mins}د`;
+                }
+            };
+
+            // مدير عرض الـ Widget
+            const widgetManager = {
+                // تحميل وتحديث الـ Widget
+                async loadPrayerWidget() {
+                    try {
+                        const data = await prayerAPI.getPrayerTimes();
+                        
+                        if (!data) {
+                            throw new Error('Failed to load prayer times');
+                        }
+
+                        const timings = data.timings;
+                        const { nextPrayer, minutes } = prayerAPI.calculateNextPrayer(timings);
+
+                        const prayers = [
+                            { name: 'Fajr', time: timings.Fajr, nameAr: 'الفجر' },
+                            { name: 'Dhuhr', time: timings.Dhuhr, nameAr: 'الظهر' },
+                            { name: 'Asr', time: timings.Asr, nameAr: 'العصر' },
+                            { name: 'Maghrib', time: timings.Maghrib, nameAr: 'المغرب' },
+                            { name: 'Isha', time: timings.Isha, nameAr: 'العشاء' }
+                        ];
+
+                        const widgetContent = document.getElementById('widgetContent');
+                        widgetContent.innerHTML = `
+                            <div class="next-prayer">
+                                <div class="next-prayer-label">الصلاة القادمة</div>
+                                <div class="next-prayer-time">${nextPrayer.time}</div>
+                                <div class="countdown">${prayerAPI.formatCountdown(minutes)}</div>
+                            </div>
+                            <div class="prayer-list">
+                                ${prayers.map(prayer => `
+                                    <div class="prayer-row ${prayer.name === nextPrayer.name ? 'next-prayer' : ''}">
+                                        <span class="prayer-name">${prayer.nameAr}</span>
+                                        <span class="prayer-time">${prayer.time}</span>
+                                    </div>
+                                `).join('')}
+                            </div>
+                        `;
+
+                    } catch (error) {
+                        console.error('Widget Error:', error);
+                        document.getElementById('widgetContent').innerHTML = `
+                            <div class="error">
+                                <i class="fas fa-exclamation-triangle"></i>
+                                خطأ في تحميل أوقات الصلاة
+                            </div>
+                        `;
+                    }
+                },
+
+                // بدء التحديث التلقائي
+                startAutoRefresh() {
+                    setInterval(() => {
+                        this.loadPrayerWidget();
+                    }, WIDGET_CONFIG.refreshInterval);
+                }
+            };
+
+            // تهيئة الـ Widget
+            function initializeWidget() {
+                // تحميل البيانات الأولية
+                widgetManager.loadPrayerWidget();
+                
+                // بدء التحديث التلقائي
+                widgetManager.startAutoRefresh();
+            }
+
+            // بدء الـ Widget عند تحميل الصفحة
+            document.addEventListener('DOMContentLoaded', initializeWidget);
+
+            // تصدير للاستخدام العام (اختياري)
+            window.PrayerWidget = {
+                prayerAPI,
+                widgetManager,
+                initializeWidget
+            };
+
+        })();
+    </script>
+</body>
+</html>
